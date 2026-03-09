@@ -98,7 +98,7 @@ class Polygon extends OGCObject implements \Countable
             throw new GeoSpatialException("A Polygon instance must be composed by LineString only.");
     }
 
-    public function count()
+    public function count(): int
     {
         return count($this->linestrings);
     }

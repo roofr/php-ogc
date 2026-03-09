@@ -2,6 +2,7 @@
 
 namespace ElevenLab\PHPOGC;
 
+use ElevenLab\PHPOGC\DataTypes\GeometryCollection;
 use ElevenLab\PHPOGC\DataTypes\MultiLineString;
 use ElevenLab\PHPOGC\DataTypes\MultiPoint;
 use ElevenLab\PHPOGC\DataTypes\MultiPolygon;
@@ -9,23 +10,27 @@ use ElevenLab\PHPOGC\Exceptions\GeoSpatialException;
 use ElevenLab\PHPOGC\DataTypes\LineString;
 use ElevenLab\PHPOGC\DataTypes\Point;
 use ElevenLab\PHPOGC\DataTypes\Polygon;
+use PHPUnit\Framework\TestCase;
 
-class FactoryTest extends \PHPUnit_Framework_TestCase
+class FactoryTest extends TestCase
 {
     public function testPointSuccess()
     {
         $points = [];
         $points[] = new Point(1.234, 2.345);
         $points[] = new Point("1.234", "2.345");
-        $points[] = Point::fromArray([1.234, 2.345]);
+        // fromArray expects [lon, lat] per OGC convention; swap to get lat=1.234, lon=2.345
+        $points[] = Point::fromArray([2.345, 1.234]);
         $points[] = Point::fromString("1.234, 2.345");
         $points[] = Point::fromString("1.234 2.345", " ");
         $points[] = Point::fromString("1.234#2.345", "#");
-        $points[] = Point::fromWKT("POINT(1.234 2.345)");
+        // POINT(lon lat) per OGC WKT: POINT(2.345 1.234) → lat=1.234, lon=2.345
+        $points[] = Point::fromWKT("POINT(2.345 1.234)");
 
-        foreach($points as $point){
-            if( get_class($point) != 'ElevenLab\PHPOGC\DataTypes\Point' || $point->lat != 1.234 || $point->lon != 2.345)
-                throw new GeoSpatialException('Error instantiating Points');
+        foreach ($points as $point) {
+            $this->assertInstanceOf(Point::class, $point);
+            $this->assertEquals(1.234, $point->lat);
+            $this->assertEquals(2.345, $point->lon);
         }
     }
 
@@ -51,12 +56,10 @@ class FactoryTest extends \PHPUnit_Framework_TestCase
         $linestrings[] = LineString::fromString('1#2@2#3@3#4@4#5', '@', '#');
         $linestrings[] = LineString::fromWKT("LINESTRING(0 0,1 1,1 2)");
 
-        foreach($linestrings as $ls){
-            if( get_class($ls) != 'ElevenLab\PHPOGC\DataTypes\LineString' )
-                throw new GeoSpatialException("Error instantianting Linestring");
-            foreach($ls->points as $point){
-                if( get_class($point) != 'ElevenLab\PHPOGC\DataTypes\Point' )
-                    throw new GeoSpatialException("LineString does not contains Points");
+        foreach ($linestrings as $ls) {
+            $this->assertInstanceOf(LineString::class, $ls);
+            foreach ($ls->points as $point) {
+                $this->assertInstanceOf(Point::class, $point);
             }
         }
     }
@@ -74,6 +77,11 @@ class FactoryTest extends \PHPUnit_Framework_TestCase
         $multipoints[] = MultiPoint::fromString("1 2: 3 4: 5 6", ":");
         $multipoints[] = MultiPoint::fromString("1_2: 3_4: 5_6", ":", "_");
         $multipoints[] = MultiPoint::fromArray([ [1, 2], [2, 3], [3, 4] ]);
+
+        $this->assertCount(5, $multipoints);
+        foreach ($multipoints as $mp) {
+            $this->assertInstanceOf(MultiPoint::class, $mp);
+        }
     }
 
     public function testLineStringCircular()
@@ -135,7 +143,7 @@ class FactoryTest extends \PHPUnit_Framework_TestCase
         $ml[] = MultiLineString::fromWKT("MULTILINESTRING((0 0,4 0,4 4,0 4),(1 1, 2 1, 2 2, 1 2))");
 
         foreach ($ml as $multilinestring) {
-            $this->assertTrue($multilinestring instanceof MultiLineString);
+            $this->assertInstanceOf(MultiLineString::class, $multilinestring);
         }
     }
 
@@ -161,16 +169,12 @@ class FactoryTest extends \PHPUnit_Framework_TestCase
         $polygons[] = Polygon::fromString($linestring4 ."#". $linestring4, "#", ":");
         $polygons[] = Polygon::fromString($linestring5 ."@". $linestring5, "@", ":", "_");
 
-
-        foreach($polygons as $poly){
-            if( get_class($poly) != 'ElevenLab\PHPOGC\DataTypes\Polygon' )
-                throw new GeoSpatialException("Error instantianting Polygon");
-            foreach($poly->linestrings as $ls){
-                if( get_class($ls) != 'ElevenLab\PHPOGC\DataTypes\LineString' )
-                    throw new GeoSpatialException("Error instantianting Linestring");
-                foreach($ls->points as $point){
-                    if( get_class($point) != 'ElevenLab\PHPOGC\DataTypes\Point' )
-                        throw new GeoSpatialException("LineString does not contains Points");
+        foreach ($polygons as $poly) {
+            $this->assertInstanceOf(Polygon::class, $poly);
+            foreach ($poly->linestrings as $ls) {
+                $this->assertInstanceOf(LineString::class, $ls);
+                foreach ($ls->points as $point) {
+                    $this->assertInstanceOf(Point::class, $point);
                 }
             }
         }
@@ -199,8 +203,7 @@ class FactoryTest extends \PHPUnit_Framework_TestCase
         $polygons[] = Polygon::fromString($linestring5 ."@". $linestring5, "@", ":", "_");
 
         $multi = new MultiPolygon($polygons);
-        if( ! $multi instanceof MultiPolygon )
-            throw new \Exception();
+        $this->assertInstanceOf(MultiPolygon::class, $multi);
 
         $mp[] = new MultiPolygon([
             new Polygon([LineString::fromArray([[1,2], [2,3], [3,4], [1,2]]), LineString::fromArray([[5,6], [7,8], [9,10], [5,6]])]),
@@ -220,16 +223,34 @@ class FactoryTest extends \PHPUnit_Framework_TestCase
         $mp[] = MultiPolygon::fromWKT("MULTIPOLYGON(((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1)),((-1 -1,-1 -2,-2 -2,-2 -1,-1 -1)))");
 
         foreach ($mp as $multipolygon) {
-            $this->assertTrue($multipolygon instanceof MultiPolygon);
+            $this->assertInstanceOf(MultiPolygon::class, $multipolygon);
         }
     }
 
-    /**
-     * @expectedException \ElevenLab\PHPOGC\Exceptions\GeoSpatialException
-     * @expectedExceptionMessage A LineString instance that compose a Polygon must be circular (min 4 points, first and last equals).
-     */
+    public function testGeometryCollection()
+    {
+        $p = new Point(1, 2);
+        $ls = LineString::fromArray([[1,2],[3,4],[5,6]]);
+        $gc = new GeometryCollection([$p, $ls]);
+
+        $this->assertInstanceOf(GeometryCollection::class, $gc);
+        $this->assertCount(2, $gc);
+
+        // Exercises GeometryCollection::toValueArray() — cross-class protected property access
+        $array = $gc->toArray();
+        $this->assertSame('POINT', $array['value'][0]['type']);
+        $this->assertSame('LINESTRING', $array['value'][1]['type']);
+
+        // Exercises __toString and toWKT
+        $wkt = $gc->toWKT();
+        $this->assertStringStartsWith('GEOMETRYCOLLECTION(', $wkt);
+    }
+
     public function testPolygonFails1()
     {
+        $this->expectException(GeoSpatialException::class);
+        $this->expectExceptionMessage('A LineString instance that compose a Polygon must be circular (min 4 points, first and last equals).');
+
         $p1 = new Point(1,1);
         $p2 = new Point(2,2);
         $p3 = new Point(3,3);
@@ -244,30 +265,27 @@ class FactoryTest extends \PHPUnit_Framework_TestCase
     public function testFromWKTSuccess()
     {
         $point = Point::fromWKT("POINT(0 0)");
-        assert($point instanceof Point);
+        $this->assertInstanceOf(Point::class, $point);
         $this->assertEquals("POINT(0 0)", $point->toWKT());
 
         $linestring = LineString::fromWKT("LINESTRING(0 0,1 1,1 2)");
-        assert($linestring instanceof LineString);
+        $this->assertInstanceOf(LineString::class, $linestring);
         $this->assertEquals("LINESTRING(0 0,1 1,1 2)", $linestring->toWKT());
 
         $multilinestring = MultiLineString::fromWKT("MULTILINESTRING((0 0,4 0,4 4,0 4,0 0),(1 1, 2 1, 2 2, 1 2,1 1))");
-        assert($multilinestring instanceof MultiLineString);
+        $this->assertInstanceOf(MultiLineString::class, $multilinestring);
         $this->assertEquals("MULTILINESTRING((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))", $multilinestring->toWKT());
 
         $multipoint = MultiPoint::fromWKT("MULTIPOINT(0 0,1 2)");
-        assert($multipoint instanceof MultiPoint);
+        $this->assertInstanceOf(MultiPoint::class, $multipoint);
         $this->assertEquals("MULTIPOINT(0 0,1 2)", $multipoint->toWKT());
 
         $polygon = Polygon::fromWKT("POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))");
-        assert($polygon instanceof Polygon);
+        $this->assertInstanceOf(Polygon::class, $polygon);
         $this->assertEquals("POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))", $polygon->toWKT());
 
         $multipolygon = MultiPolygon::fromWKT("MULTIPOLYGON(((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1)),((-1 -1,-1 -2,-2 -2,-2 -1,-1 -1)))");
-        assert($multipolygon instanceof MultiPolygon);
+        $this->assertInstanceOf(MultiPolygon::class, $multipolygon);
         $this->assertEquals("MULTIPOLYGON(((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1)),((-1 -1,-1 -2,-2 -2,-2 -1,-1 -1)))", $multipolygon->toWKT());
     }
-
-
-
 }

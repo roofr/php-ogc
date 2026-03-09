@@ -34,10 +34,7 @@ class GeometryCollection extends OGCObject implements \Countable
     protected function toValueArray()
     {
         return array_map(function($ogcobject){
-            return [
-                'type' => $ogcobject->type,
-                'value' => $ogcobject->toArray()
-            ];
+            return $ogcobject->toArray();
         }, $this->geometries);
     }
 
@@ -50,8 +47,8 @@ class GeometryCollection extends OGCObject implements \Countable
     /**
      * @return int
      */
-    public function count()
+    public function count(): int
     {
-        return sizeof($this->geometries);
+        return count($this->geometries);
     }
 }
