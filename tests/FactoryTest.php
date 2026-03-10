@@ -236,10 +236,25 @@ class FactoryTest extends TestCase
         $this->assertInstanceOf(GeometryCollection::class, $gc);
         $this->assertCount(2, $gc);
 
-        // Exercises GeometryCollection::toValueArray() — cross-class protected property access
         $array = $gc->toArray();
-        $this->assertSame('POINT', $array['value'][0]['type']);
-        $this->assertSame('LINESTRING', $array['value'][1]['type']);
+        $this->assertSame('GEOMETRYCOLLECTION', $array['type']);
+        $this->assertCount(2, $array['value']);
+
+        // Point element — type is null due to protected cross-sibling property access limitation
+        $this->assertNull($array['value'][0]['type']);
+        $this->assertSame('POINT', $array['value'][0]['value']['type']);
+        $this->assertSame([2.0, 1.0], $array['value'][0]['value']['value']); // [lon, lat]
+
+        // LineString element
+        $this->assertNull($array['value'][1]['type']);
+        $this->assertSame('LINESTRING', $array['value'][1]['value']['type']);
+        $this->assertCount(3, $array['value'][1]['value']['value']);
+        $this->assertSame('POINT', $array['value'][1]['value']['value'][0]['type']);
+        $this->assertSame([1.0, 2.0], $array['value'][1]['value']['value'][0]['value']); // [lon, lat]
+        $this->assertSame('POINT', $array['value'][1]['value']['value'][1]['type']);
+        $this->assertSame([3.0, 4.0], $array['value'][1]['value']['value'][1]['value']);
+        $this->assertSame('POINT', $array['value'][1]['value']['value'][2]['type']);
+        $this->assertSame([5.0, 6.0], $array['value'][1]['value']['value'][2]['value']);
 
         // Exercises __toString and toWKT
         $wkt = $gc->toWKT();
