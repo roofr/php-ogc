@@ -4,7 +4,9 @@ namespace ElevenLab\PHPOGC;
 
 use ElevenLab\PHPOGC\DataTypes\Point;
 
-class PointsTest extends \PHPUnit_Framework_TestCase
+use PHPUnit\Framework\TestCase;
+
+class PointTest extends TestCase
 {
     public function testPointDistance()
     {
